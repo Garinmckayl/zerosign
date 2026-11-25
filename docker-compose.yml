@@ -1,0 +1,14 @@
+services:
+  zerosign:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - ZEROSIGN_DB_PATH=/app/data/zerosign.db
+      - ZEROSIGN_UPLOAD_DIR=/app/data/uploads
+    volumes:
+      - zerosign_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  zerosign_data:
