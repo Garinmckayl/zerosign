@@ -3,12 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   decodePngDataUrl,
   embedSignatureOnFirstPage,
+  embedSignatureOnPage,
   inspectPdf,
 } from "../pdf";
 
 // Valid 1x1 transparent PNG
 const SAMPLE_PNG_BASE64 =
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgWjR9awAAAABJRU5ErkJggg==";
 
 async function makeBlankPdf(pageCount = 1): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
@@ -47,6 +48,22 @@ describe("PDF signature embedding", () => {
     expect(loaded.getPage(0).getSize()).toEqual({ width: 612, height: 792 });
   });
 
+  it("embeds a signature on the requested page", async () => {
+    const originalPdf = await makeBlankPdf(3);
+    const sigBytes = decodePngDataUrl(SAMPLE_PNG_BASE64);
+    const signedPdf = await embedSignatureOnPage(originalPdf, sigBytes, {
+      pageNumber: 2,
+      xPercent: 0.5,
+      yPercent: 0.75,
+    });
+
+    const loaded = await PDFDocument.load(signedPdf);
+    expect(loaded.getPageCount()).toBe(3);
+    expect(loaded.getPage(1).node.Contents()).toBeDefined();
+    expect(loaded.getPage(0).node.Contents()).toBeUndefined();
+    expect(loaded.getPage(2).node.Contents()).toBeUndefined();
+  });
+
   it("rejects out-of-range placement coordinates", async () => {
     const originalPdf = await makeBlankPdf(1);
     const sigBytes = decodePngDataUrl(SAMPLE_PNG_BASE64);
@@ -57,5 +74,18 @@ describe("PDF signature embedding", () => {
         yPercent: 0.5,
       })
     ).rejects.toThrow(/coordinates/i);
+  });
+
+  it("rejects page numbers outside the document", async () => {
+    const originalPdf = await makeBlankPdf(2);
+    const sigBytes = decodePngDataUrl(SAMPLE_PNG_BASE64);
+
+    await expect(
+      embedSignatureOnPage(originalPdf, sigBytes, {
+        pageNumber: 3,
+        xPercent: 0.5,
+        yPercent: 0.5,
+      })
+    ).rejects.toThrow(/page number/i);
   });
 });

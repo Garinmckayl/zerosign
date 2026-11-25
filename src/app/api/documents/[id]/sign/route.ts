@@ -11,6 +11,7 @@ export async function POST(
   const { id } = await context.params;
   const body = (await request.json().catch(() => null)) as {
     signatureDataUrl?: string;
+    pageNumber?: number;
     xPercent?: number;
     yPercent?: number;
     widthPercent?: number;
@@ -31,6 +32,7 @@ export async function POST(
       id,
       signaturePngBytes,
       placement: {
+        pageNumber: typeof body.pageNumber === "number" ? body.pageNumber : 1,
         xPercent: typeof body.xPercent === "number" ? body.xPercent : 0.5,
         yPercent: typeof body.yPercent === "number" ? body.yPercent : 0.78,
         widthPercent:
