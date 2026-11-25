@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Download,
   Eraser,
   FileText,
@@ -38,6 +40,7 @@ export function ZeroSignWorkbench({
   const [uploading, setUploading] = useState(false);
   const [signing, setSigning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Signature pad state
   const [mode, setMode] = useState<"draw" | "type">("draw");
@@ -145,6 +148,7 @@ export function ZeroSignWorkbench({
       }
       setDocs((prev) => [data.document!, ...prev]);
       setSelectedId(data.document.id);
+      setCurrentPage(1);
     } catch {
       setError("Network error during upload.");
     } finally {
@@ -175,6 +179,7 @@ export function ZeroSignWorkbench({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           signatureDataUrl,
+          pageNumber: currentPage,
           xPercent: placement.xPercent,
           yPercent: placement.yPercent,
           widthPercent: 0.28,
@@ -247,7 +252,10 @@ export function ZeroSignWorkbench({
                   <button
                     key={doc.id}
                     type="button"
-                    onClick={() => setSelectedId(doc.id)}
+                    onClick={() => {
+                      setSelectedId(doc.id);
+                      setCurrentPage(1);
+                    }}
                     className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-xs transition-colors cursor-pointer ${
                       doc.id === selectedId
                         ? "border-[#f5efe6]/30 bg-white/[0.07] text-[#f5efe6]"
@@ -370,7 +378,7 @@ export function ZeroSignWorkbench({
                 disabled={!selectedDoc || !signatureDataUrl || signing}
                 className="flex-1 rounded-lg bg-[#f5efe6] px-4 py-2.5 text-xs font-semibold text-[#0c0c0e] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
               >
-                {signing ? "Embedding Signature..." : "Sign Page 1 with pdf-lib"}
+                {signing ? "Embedding Signature..." : `Sign Page ${currentPage} with pdf-lib`}
               </button>
 
               {selectedDoc?.status === "signed" && (
@@ -407,6 +415,32 @@ export function ZeroSignWorkbench({
               )}
             </div>
 
+            {selectedDoc && selectedDoc.pageCount > 1 && (
+              <div className="mb-3 flex items-center justify-center gap-3" aria-label="PDF page navigation">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  disabled={currentPage <= 1}
+                  aria-label="Previous page"
+                  className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-[#0c0c0e] px-3 py-2 text-xs text-[#f5efe6] hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" /> Previous
+                </button>
+                <span className="min-w-20 text-center font-mono text-xs text-[#c8c4bc]" aria-live="polite">
+                  Page {currentPage} of {selectedDoc.pageCount}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((page) => Math.min(selectedDoc.pageCount, page + 1))}
+                  disabled={currentPage >= selectedDoc.pageCount}
+                  aria-label="Next page"
+                  className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-[#0c0c0e] px-3 py-2 text-xs text-[#f5efe6] hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+
             {!selectedDoc ? (
               <div className="flex h-[520px] flex-col items-center justify-center rounded-lg border border-dashed border-white/15 bg-[#0c0c0e] text-center">
                 <FileText className="mb-3 h-8 w-8 text-[#78756e]" />
@@ -427,7 +461,7 @@ export function ZeroSignWorkbench({
               >
                 <iframe
                   key={`${selectedDoc.id}-${selectedDoc.status}-${selectedDoc.signedAt ?? "draft"}`}
-                  src={`/api/documents/${selectedDoc.id}/file?variant=${selectedDoc.status === "signed" ? "signed" : "original"}#page=1&toolbar=0&navpanes=0`}
+                  src={`/api/documents/${selectedDoc.id}/file?variant=${selectedDoc.status === "signed" ? "signed" : "original"}#page=${currentPage}&toolbar=0&navpanes=0`}
                   title={selectedDoc.title}
                   className="pointer-events-none h-full w-full"
                 />

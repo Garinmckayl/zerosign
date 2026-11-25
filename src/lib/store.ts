@@ -5,7 +5,7 @@ import { desc, eq } from "drizzle-orm";
 import { getDb, type ZeroSignDb } from "@/db";
 import { documents, type DocumentRecord } from "@/db/schema";
 import {
-  embedSignatureOnFirstPage,
+  embedSignatureOnPage,
   inspectPdf,
   type SignaturePlacement,
 } from "./pdf";
@@ -78,13 +78,10 @@ export class DocumentStore {
     if (!record) return null;
 
     const targetPath =
-      variant === "signed" && record.signedPath
-        ? record.signedPath
-        : record.originalPath;
-
+      variant === "signed" && record.signedPath ? record.signedPath : record.originalPath;
     if (!fs.existsSync(targetPath)) return null;
     const bytes = new Uint8Array(fs.readFileSync(targetPath));
-    const baseName = record.originalFilename.replace(/\.pdf$/i, "");
+    const baseName = record.originalFilename.replace(/\.pdf$/i, "") || "document";
     const filename =
       variant === "signed" && record.signedPath
         ? `${baseName}-signed.pdf`
@@ -108,7 +105,7 @@ export class DocumentStore {
     }
 
     const originalBytes = new Uint8Array(fs.readFileSync(record.originalPath));
-    const signedBytes = await embedSignatureOnFirstPage(
+    const signedBytes = await embedSignatureOnPage(
       originalBytes,
       params.signaturePngBytes,
       params.placement

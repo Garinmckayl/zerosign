@@ -1,9 +1,11 @@
 import { PDFDocument } from "pdf-lib";
 
 export interface SignaturePlacement {
-  /** Normalized X coordinate (0..1) from left edge of page 1 (center of signature) */
+  /** 1-based page number to sign (defaults to page 1). */
+  pageNumber?: number;
+  /** Normalized X coordinate (0..1) from left edge of the selected page (center of signature) */
   xPercent: number;
-  /** Normalized Y coordinate (0..1) from top edge of page 1 (center of signature) */
+  /** Normalized Y coordinate (0..1) from top edge of the selected page (center of signature) */
   yPercent: number;
   /** Normalized signature box width as fraction of page width (default 0.28) */
   widthPercent?: number;
@@ -45,7 +47,7 @@ export async function inspectPdf(pdfBytes: Uint8Array): Promise<PdfMetadata> {
   };
 }
 
-export async function embedSignatureOnFirstPage(
+export async function embedSignatureOnPage(
   pdfBytes: Uint8Array,
   signaturePngBytes: Uint8Array,
   placement: SignaturePlacement
@@ -57,7 +59,7 @@ export async function embedSignatureOnFirstPage(
     throw new Error("Signature image is empty.");
   }
 
-  const { xPercent, yPercent, widthPercent = 0.28 } = placement;
+  const { xPercent, yPercent, widthPercent = 0.28, pageNumber = 1 } = placement;
   if (
     Number.isNaN(xPercent) ||
     Number.isNaN(yPercent) ||
@@ -68,15 +70,21 @@ export async function embedSignatureOnFirstPage(
   ) {
     throw new Error("Signature coordinates must be between 0 and 1.");
   }
+  if (!Number.isInteger(pageNumber) || pageNumber < 1) {
+    throw new Error("Page number must be a positive integer.");
+  }
 
   const pdfDoc = await PDFDocument.load(pdfBytes);
   const pages = pdfDoc.getPages();
   if (pages.length === 0) {
     throw new Error("PDF document has no pages.");
   }
+  if (pageNumber > pages.length) {
+    throw new Error(`Page number must be between 1 and ${pages.length}.`);
+  }
 
-  const firstPage = pages[0];
-  const { width: pageWidth, height: pageHeight } = firstPage.getSize();
+  const page = pages[pageNumber - 1];
+  const { width: pageWidth, height: pageHeight } = page.getSize();
 
   const pngImage = await pdfDoc.embedPng(signaturePngBytes);
   const targetWidth = Math.max(
@@ -93,7 +101,7 @@ export async function embedSignatureOnFirstPage(
   const clampedX = Math.max(0, Math.min(pageWidth - targetWidth, rawX));
   const clampedY = Math.max(0, Math.min(pageHeight - targetHeight, rawY));
 
-  firstPage.drawImage(pngImage, {
+  page.drawImage(pngImage, {
     x: clampedX,
     y: clampedY,
     width: targetWidth,
@@ -102,3 +110,6 @@ export async function embedSignatureOnFirstPage(
 
   return pdfDoc.save();
 }
+
+/** @deprecated Use embedSignatureOnPage to select a page explicitly. */
+export const embedSignatureOnFirstPage = embedSignatureOnPage;
